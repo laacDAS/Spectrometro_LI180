@@ -41,6 +41,13 @@ Este repositório contém scripts, funções e dados para análise e visualizaç
 - Consulte os scripts e funções para detalhes sobre parâmetros e formatos de entrada.
 - O arquivo `Forma_de_uso.md` em `TratarDadosPlotSurface/` traz instruções específicas para uso dos scripts Python.
 
+## 🆕 Novidades e melhorias recentes
+
+- A interface gráfica está mais organizada, com opções de interpolação e escolha de variável (PPFD/PFD) separadas em subseções.
+- Os botões de interpolação agora têm destaque azul quando selecionados, facilitando a visualização.
+- Ao tentar organizar arquivos, o sistema avisa se não houver arquivos válidos para mover, evitando confusões.
+- Mensagens de feedback e confirmação mais claras em todas as ações principais.
+
 ## 📦 Dependências
 
 ### R
