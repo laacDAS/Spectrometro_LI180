@@ -1,6 +1,6 @@
 # Guia de Uso do Sistema de Processamento de Dados LI-180
 
-Primeiramente, os dados são obtidos pelo aparelho LiCor LI-180 Spectometer.
+Os dados são obtidos pelo aparelho LiCor LI-180 Spectometer e devem ser colocados em uma pasta junto com os arquivos python, batch e VBS.
 
 ## 1. Coleta e Nomeação dos Arquivos
 
@@ -55,7 +55,3 @@ Primeiramente, os dados são obtidos pelo aparelho LiCor LI-180 Spectometer.
   pip install pyinstaller
   pyinstaller --onefile main.py
   ```
-
----
-
-**Dúvidas ou problemas? Consulte o código-fonte ou entre em contato com o responsável pelo script.**

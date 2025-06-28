@@ -1,8 +1,6 @@
 import os
 import re
 import shutil
-import tkinter as tk
-from tkinter import filedialog
 import pandas as pd
 import plotly.graph_objects as go
 import numpy as np
@@ -32,21 +30,22 @@ def organizar_arquivos_por_padrao(pasta: str) -> bool:
     }
 
     # Cria subpastas se não existirem
-    for subpasta in padroes.keys():
+    for subpasta in padroes:
         os.makedirs(os.path.join(pasta, subpasta), exist_ok=True)
 
     arquivos_movidos = 0
     # Organiza os arquivos
     for arquivo in os.listdir(pasta):
         caminho_arquivo = os.path.join(pasta, arquivo)
-        if os.path.isfile(caminho_arquivo):
-            for subpasta, padrao in padroes.items():
-                if re.match(padrao, arquivo):
-                    destino = os.path.join(pasta, subpasta, arquivo)
-                    shutil.move(caminho_arquivo, destino)
-                    print(f'Movido: {arquivo} -> {subpasta}')
-                    arquivos_movidos += 1
-                    break
+        if not os.path.isfile(caminho_arquivo):
+            continue
+        for subpasta, padrao in padroes.items():
+            if re.match(padrao, arquivo):
+                destino = os.path.join(pasta, subpasta, arquivo)
+                shutil.move(caminho_arquivo, destino)
+                print(f'Movido: {arquivo} -> {subpasta}')
+                arquivos_movidos += 1
+                break
 
     if arquivos_movidos == 0:
         print('Nenhum arquivo encontrado para organizar.')
@@ -85,28 +84,35 @@ def extrair_coordenadas_e_valores_espd(pasta: str, salvar_csv: bool = False) -> 
 
     for arquivo in os.listdir(pasta):
         match = padrao_nome.match(arquivo)
-        if match:
-            x = int(match.group(1))
-            y = int(match.group(2))
-            pfd = None
-            ppfd = None
-            terminacao = None
-            for nome_terminacao, padrao in padroes_terminacao.items():
-                if re.match(padrao, arquivo):
-                    terminacao = nome_terminacao
-                    break
-            with open(os.path.join(pasta, arquivo), encoding='utf-8') as f:
-                for linha in f:
-                    if linha.startswith('PFD\t') or linha.startswith('PFD '):
-                        partes = re.split(r'\s+|\t+', linha.strip())
-                        if len(partes) > 1:
-                            pfd = float(partes[1].replace(',', '.'))
-                    if linha.startswith('PPFD\t') or linha.startswith('PPFD '):
-                        partes = re.split(r'\s+|\t+', linha.strip())
-                        if len(partes) > 1:
-                            ppfd = float(partes[1].replace(',', '.'))
-            dados.append({'arquivo': arquivo, 'ID': terminacao, 'linha': x,
-                         'coluna': y, 'PFD': pfd, 'PPFD': ppfd})
+        if not match:
+            continue
+        x = int(match.group(1))
+        y = int(match.group(2))
+        pfd = None
+        ppfd = None
+        terminacao = None
+        for nome_terminacao, padrao in padroes_terminacao.items():
+            if re.match(padrao, arquivo):
+                terminacao = nome_terminacao
+                break
+        with open(os.path.join(pasta, arquivo), encoding='utf-8') as f:
+            for linha in f:
+                if linha.startswith('PFD\t') or linha.startswith('PFD '):
+                    partes = re.split(r'\s+|\t+', linha.strip())
+                    if len(partes) > 1:
+                        pfd = float(partes[1].replace(',', '.'))
+                if linha.startswith('PPFD\t') or linha.startswith('PPFD '):
+                    partes = re.split(r'\s+|\t+', linha.strip())
+                    if len(partes) > 1:
+                        ppfd = float(partes[1].replace(',', '.'))
+        dados.append({
+            'arquivo': arquivo,
+            'ID': terminacao,
+            'linha': x,
+            'coluna': y,
+            'PFD': pfd,
+            'PPFD': ppfd
+        })
 
     df = pd.DataFrame(dados)
     for col in ['linha', 'coluna']:
@@ -114,9 +120,8 @@ def extrair_coordenadas_e_valores_espd(pasta: str, salvar_csv: bool = False) -> 
             df[col] = pd.Series(dtype=int)
 
     # Caminho do coordenadas.csv
-    caminho_coordenadas = os.path.join(pasta, '..', 'coordenadas.csv')
-    caminho_coordenadas = os.path.abspath(caminho_coordenadas)
-
+    caminho_coordenadas = os.path.abspath(
+        os.path.join(pasta, '..', 'coordenadas.csv'))
     if os.path.exists(caminho_coordenadas):
         df_coord = pd.read_csv(caminho_coordenadas)
         df = pd.merge(df, df_coord[['x', 'y', 'linha', 'coluna']], left_on=[
