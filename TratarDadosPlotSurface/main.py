@@ -9,14 +9,19 @@ import tkinter as tk
 
 
 class ToolTip:
-    def __init__(self, widget, text):
+    def __init__(self, widget, text, delay=600):
         self.widget = widget
         self.text = text
         self.tipwindow = None
-        self.widget.bind("<Enter>", self.show_tip)
+        self.delay = delay  # tempo em ms
+        self._after_id = None
+        self.widget.bind("<Enter>", self.schedule_tip)
         self.widget.bind("<Leave>", self.hide_tip)
         self.widget.bind("<Motion>", self.move_tip)
         self._last_xy = (0, 0)
+
+    def schedule_tip(self, event=None):
+        self._after_id = self.widget.after(self.delay, self.show_tip)
 
     def show_tip(self, event=None):
         if self.tipwindow or not self.text:
@@ -35,6 +40,9 @@ class ToolTip:
             self.tipwindow.wm_geometry(f"+{x+20}+{y+20}")
 
     def hide_tip(self, event=None):
+        if self._after_id:
+            self.widget.after_cancel(self._after_id)
+            self._after_id = None
         if self.tipwindow:
             self.tipwindow.destroy()
             self.tipwindow = None
@@ -44,11 +52,23 @@ class App(tb.Window):
     def __init__(self):
         super().__init__(themename="flatly")
         self.title("Trabalhar dados do LI-180 | Platar pontos")
-        self.geometry("450x650")
         self.resizable(True, True)
         self.usar_ppfd = tb.BooleanVar(value=True)
         self._setup_terminal()
         self._create_main_interface()
+        self.update_idletasks()
+        self.geometry("")  # Ajusta ao conteúdo
+        self._center_window()
+
+    def _center_window(self):
+        self.update_idletasks()
+        width = self.winfo_width()
+        height = self.winfo_height()
+        screen_width = self.winfo_screenwidth()
+        screen_height = self.winfo_screenheight()
+        x = (screen_width // 2) - (width // 2)
+        y = (screen_height // 2) - (height // 2)
+        self.geometry(f"{width}x{height}+{x}+{y}")
 
     def _create_main_interface(self):
         self._create_widgets(self)
@@ -60,11 +80,9 @@ class App(tb.Window):
         help_button = tb.Button(
             bottom_btn_frame, text="Ajuda", bootstyle=INFO, command=self.open_help_window)
         help_button.pack(side='left', padx=(0, 12))
-        ToolTip(help_button, "Abre o guia de uso e instruções detalhadas do sistema.")
         sair_button = tb.Button(
             bottom_btn_frame, text="Sair", width=18, bootstyle=DANGER, command=self.quit)
         sair_button.pack(side='left')
-        ToolTip(sair_button, "Fecha o programa.")
 
     def open_help_window(self):
         help_win = tb.Toplevel(self)
@@ -126,7 +144,7 @@ class App(tb.Window):
                             command=self.extrair_coordenadas)
         btn_ext.pack(pady=4, padx=8)
         ToolTip(
-            btn_ext, "Extrai coordenadas e valores dos arquivos nas subpastas e gera arquivos CSV.")
+            btn_ext, "Extrai coordenadas e valores PPFD e PFD dos arquivos nas subpastas e gera arquivos CSV.")
 
     def _create_plotagem(self, parent):
         frame_plot = tb.Labelframe(
