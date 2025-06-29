@@ -1,16 +1,17 @@
 import os
 import re
 import shutil
+import tkinter as tk
+from tkinter import filedialog
 import pandas as pd
 import plotly.graph_objects as go
 import numpy as np
 from scipy.interpolate import griddata
 
 
-def organizar_arquivos_por_padrao(pasta: str) -> bool:
+def organizar_arquivos_por_padrao(pasta: str) -> None:
     """
     Organiza arquivos em subpastas conforme padrões definidos no nome do arquivo.
-    Retorna True se algum arquivo foi movido, False caso contrário.
 
     Args:
         pasta (str): Caminho da pasta a ser organizada. Os arquivos serão movidos para subpastas conforme o padrão de nome.
@@ -30,28 +31,21 @@ def organizar_arquivos_por_padrao(pasta: str) -> bool:
     }
 
     # Cria subpastas se não existirem
-    for subpasta in padroes:
+    for subpasta in padroes.keys():
         os.makedirs(os.path.join(pasta, subpasta), exist_ok=True)
 
-    arquivos_movidos = 0
     # Organiza os arquivos
     for arquivo in os.listdir(pasta):
         caminho_arquivo = os.path.join(pasta, arquivo)
-        if not os.path.isfile(caminho_arquivo):
-            continue
-        for subpasta, padrao in padroes.items():
-            if re.match(padrao, arquivo):
-                destino = os.path.join(pasta, subpasta, arquivo)
-                shutil.move(caminho_arquivo, destino)
-                print(f'Movido: {arquivo} -> {subpasta}')
-                arquivos_movidos += 1
-                break
+        if os.path.isfile(caminho_arquivo):
+            for subpasta, padrao in padroes.items():
+                if re.match(padrao, arquivo):
+                    destino = os.path.join(pasta, subpasta, arquivo)
+                    shutil.move(caminho_arquivo, destino)
+                    print(f'Movido: {arquivo} -> {subpasta}')
+                    break
 
-    if arquivos_movidos == 0:
-        print('Nenhum arquivo encontrado para organizar.')
-        return False
     print('Organização concluída!')
-    return True
 
 
 def extrair_coordenadas_e_valores_espd(pasta: str, salvar_csv: bool = False) -> pd.DataFrame:
@@ -84,35 +78,28 @@ def extrair_coordenadas_e_valores_espd(pasta: str, salvar_csv: bool = False) -> 
 
     for arquivo in os.listdir(pasta):
         match = padrao_nome.match(arquivo)
-        if not match:
-            continue
-        x = int(match.group(1))
-        y = int(match.group(2))
-        pfd = None
-        ppfd = None
-        terminacao = None
-        for nome_terminacao, padrao in padroes_terminacao.items():
-            if re.match(padrao, arquivo):
-                terminacao = nome_terminacao
-                break
-        with open(os.path.join(pasta, arquivo), encoding='utf-8') as f:
-            for linha in f:
-                if linha.startswith('PFD\t') or linha.startswith('PFD '):
-                    partes = re.split(r'\s+|\t+', linha.strip())
-                    if len(partes) > 1:
-                        pfd = float(partes[1].replace(',', '.'))
-                if linha.startswith('PPFD\t') or linha.startswith('PPFD '):
-                    partes = re.split(r'\s+|\t+', linha.strip())
-                    if len(partes) > 1:
-                        ppfd = float(partes[1].replace(',', '.'))
-        dados.append({
-            'arquivo': arquivo,
-            'ID': terminacao,
-            'linha': x,
-            'coluna': y,
-            'PFD': pfd,
-            'PPFD': ppfd
-        })
+        if match:
+            x = int(match.group(1))
+            y = int(match.group(2))
+            pfd = None
+            ppfd = None
+            terminacao = None
+            for nome_terminacao, padrao in padroes_terminacao.items():
+                if re.match(padrao, arquivo):
+                    terminacao = nome_terminacao
+                    break
+            with open(os.path.join(pasta, arquivo), encoding='utf-8') as f:
+                for linha in f:
+                    if linha.startswith('PFD\t') or linha.startswith('PFD '):
+                        partes = re.split(r'\s+|\t+', linha.strip())
+                        if len(partes) > 1:
+                            pfd = float(partes[1].replace(',', '.'))
+                    if linha.startswith('PPFD\t') or linha.startswith('PPFD '):
+                        partes = re.split(r'\s+|\t+', linha.strip())
+                        if len(partes) > 1:
+                            ppfd = float(partes[1].replace(',', '.'))
+            dados.append({'arquivo': arquivo, 'ID': terminacao, 'linha': x,
+                         'coluna': y, 'PFD': pfd, 'PPFD': ppfd})
 
     df = pd.DataFrame(dados)
     for col in ['linha', 'coluna']:
@@ -120,8 +107,9 @@ def extrair_coordenadas_e_valores_espd(pasta: str, salvar_csv: bool = False) -> 
             df[col] = pd.Series(dtype=int)
 
     # Caminho do coordenadas.csv
-    caminho_coordenadas = os.path.abspath(
-        os.path.join(pasta, '..', 'coordenadas.csv'))
+    caminho_coordenadas = os.path.join(pasta, '..', 'coordenadas.csv')
+    caminho_coordenadas = os.path.abspath(caminho_coordenadas)
+
     if os.path.exists(caminho_coordenadas):
         df_coord = pd.read_csv(caminho_coordenadas)
         df = pd.merge(df, df_coord[['x', 'y', 'linha', 'coluna']], left_on=[
@@ -167,34 +155,17 @@ def plotar_3d_ppfd(df: pd.DataFrame, usar_ppfd: bool = True) -> None:
         )
     )])
 
-    # Mapeamento dos nomes para exibição
-    nomes_legenda = {
-        '99100': 'RBW100%',
-        '0T':    'RBW15%',
-        '100V':  'R100%',
-        '100B':  'W100%',
-        '100A':  'B100%',
-        '0V':    'R15%',
-        '0B':    'W15%',
-        '0A':    'B15%'
-    }
-    # Tenta identificar a cor pelo nome da pasta (df deve ter coluna 'ID' ou use um argumento extra)
-    cor_nome = None
-    if 'ID' in df.columns and not df['ID'].isnull().all():
-        chave = str(df['ID'].iloc[0])
-        cor_nome = nomes_legenda.get(chave, chave)
-    else:
-        cor_nome = ''
-
     fig.update_layout(
         scene=dict(
             xaxis_title='Linha (X)',
             yaxis_title='Coluna (Y)',
-            zaxis_title=z_label,
-            camera_eye=dict(x=2, y=-2, z=0.7)
+            zaxis_title=z_label
         ),
-        title=f'Distribuição 3D de {z_label} - {cor_nome}'
+        title=f'Distribuição 3D de {z_label}'
     )
+
+    fig.update_layout(scene_camera_eye=dict(x=2, y=-2, z=2.0))
+
     fig.show()
 
 
@@ -207,29 +178,13 @@ def plotar_surface_ppfd(df: pd.DataFrame, usar_ppfd: bool = True, interpolar: st
     Args:
         df (pd.DataFrame): DataFrame com colunas 'linha', 'coluna', 'PPFD', 'PFD'.
         usar_ppfd (bool, opcional): Se True, plota PPFD; se False, plota PFD. Padrão é True.
-        interpolar (str, opcional): Método de interpolação para o griddata. Padrão é 'cubic'.
+        interpolar (str, opcional): Método de interpolação. Padrão é 'cubic'.
 
     Exemplo:
         plotar_surface_ppfd(df, usar_ppfd=False, interpolar='linear')
     """
     z_col = 'PPFD' if usar_ppfd else 'PFD'
     z_label = 'PPFD (umol m⁻² s⁻¹)' if usar_ppfd else 'PFD (umol m⁻² s⁻¹)'
-
-    # Mapeamento dos nomes para exibição
-    nomes_legenda = {
-        '99100': 'RBW100%',
-        '0T':    'RBW15%',
-        '100V':  'R100%',
-        '100B':  'W100%',
-        '100A':  'B100%',
-        '0V':    'R15%',
-        '0B':    'W15%',
-        '0A':    'B15%'
-    }
-    cor_nome = ''
-    if 'ID' in df.columns and not df['ID'].isnull().all():
-        chave = str(df['ID'].iloc[0])
-        cor_nome = nomes_legenda.get(chave, chave)
 
     x = df['linha']
     y = df['coluna']
@@ -245,7 +200,7 @@ def plotar_surface_ppfd(df: pd.DataFrame, usar_ppfd: bool = True, interpolar: st
             x=xi,
             y=yi,
             z=zi,
-            colorscale='Viridis_r',  # gradiente invertido
+            colorscale='Viridis',
             colorbar=dict(title=z_label),
             contours={
                 "z": {"show": True, "usecolormap": True, "highlightcolor": "limegreen", "project_z": True}
@@ -256,7 +211,6 @@ def plotar_surface_ppfd(df: pd.DataFrame, usar_ppfd: bool = True, interpolar: st
 
     axis_style = dict(
         showbackground=False,
-        backgroundcolor='rgba(0,0,0,0)',
         showgrid=True,
         zeroline=True,
         showticklabels=True,
@@ -265,14 +219,14 @@ def plotar_surface_ppfd(df: pd.DataFrame, usar_ppfd: bool = True, interpolar: st
 
     fig.update_layout(
         scene=dict(
-            xaxis=dict(axis_style, title='Linha (X)'),
-            yaxis=dict(axis_style, title='Coluna (Y)'),
-            zaxis=dict(axis_style, title=z_label),
-            camera_eye=dict(x=2, y=-2, z=0.7),
-            bgcolor='rgba(0,0,0,0)'
+            xaxis=axis_style,
+            yaxis=axis_style,
+            zaxis=axis_style
         ),
-        title=f'Surface Plot 3D Interpolado de {z_label} - {cor_nome}'
+        title=f'Surface Plot 3D Interpolado de {z_label} ({interpolar})',
     )
+
+    fig.update_layout(scene_camera_eye=dict(x=2, y=-2, z=0.7))
 
     fig.show()
 
@@ -286,7 +240,7 @@ def plotar_multiple_surface_ppfd(dfs: list, nomes: list, usar_ppfd: bool = True,
         dfs (list of pd.DataFrame): Lista de DataFrames, um para cada superfície.
         nomes (list of str): Lista de nomes para cada superfície (usado na legenda e hover).
         usar_ppfd (bool, opcional): Se True, plota PPFD; se False, plota PFD. Padrão é True.
-        interpolar (str, opcional): Método de interpolação para o griddata. Padrão é 'cubic'.
+        interpolar (str, opcional): Método de interpolação. Padrão é 'cubic'.
 
     Exemplo:
         plotar_multiple_surface_ppfd([df1, df2], ['Pasta1', 'Pasta2'], usar_ppfd=True, interpolar='linear')
@@ -311,6 +265,8 @@ def plotar_multiple_surface_ppfd(dfs: list, nomes: list, usar_ppfd: bool = True,
         # Azul degradê
         '0A':    [[0, 'rgb(21,101,192)'], [1, 'rgb(144,202,249)']]
     }
+
+    # Mapeamento dos nomes para exibição no hover
     nomes_legenda = {
         '99100': 'RBW100%',
         '0T':    'RBW15%',
@@ -333,8 +289,10 @@ def plotar_multiple_surface_ppfd(dfs: list, nomes: list, usar_ppfd: bool = True,
             if chave in nome:
                 return valor
         return nome
+
     z_col = 'PPFD' if usar_ppfd else 'PFD'
     z_label = 'PPFD (umol m⁻² s⁻¹)' if usar_ppfd else 'PFD (umol m⁻² s⁻¹)'
+
     for idx, (df, nome) in enumerate(zip(dfs, nomes)):
         x = df['linha']
         y = df['coluna']
@@ -360,23 +318,33 @@ def plotar_multiple_surface_ppfd(dfs: list, nomes: list, usar_ppfd: bool = True,
             hovertemplate=f"{nome_legenda}<br>Linha (Y): %{{y}}<br>Coluna (X): %{{x}}<br>{z_label}: %{{z:.2f}}<extra></extra>",
             visible=True
         ))
+
     axis_style = dict(
         showbackground=False,
-        backgroundcolor='rgba(0,0,0,0)',
         showgrid=True,
         zeroline=True,
         showticklabels=True,
         title=''
     )
+
+    # Cria frames para rotação automática (60fps, 1 minuto, 3 voltas)
+    total_frames = 1200
+    frames = []
+    for i, angle in enumerate(np.linspace(0, 1080, total_frames)):
+        frames.append(go.Frame(layout=dict(
+            scene_camera_eye=dict(
+                x=2*np.cos(np.radians(angle)), y=2*np.sin(np.radians(angle)), z=0.7)
+        )))
+    fig.frames = frames
+
     fig.update_layout(
         scene=dict(
-            xaxis=dict(axis_style, title='Linha (X)'),
-            yaxis=dict(axis_style, title='Coluna (Y)'),
-            zaxis=dict(axis_style, title=z_label),
-            camera_eye=dict(x=2, y=-2, z=0.7),
-            bgcolor='rgba(0,0,0,0)'
+            xaxis=axis_style,
+            yaxis=axis_style,
+            zaxis=axis_style,
+            camera_eye=dict(x=2, y=-2, z=0.7)
         ),
-        title=f'Múltiplas Superfícies 3D Interpoladas de {z_label} - Todas as Superfícies',
+        title=f'Múltiplas Superfícies 3D Interpoladas de {z_label} ({interpolar})',
         legend=dict(
             title="Superfícies",
             itemsizing='constant',
@@ -385,8 +353,9 @@ def plotar_multiple_surface_ppfd(dfs: list, nomes: list, usar_ppfd: bool = True,
             xanchor='left',
             yanchor='middle'
         ),
-        uirevision='manter_rotacao'
+        uirevision='manter_rotacao',
     )
+
     # Ativa a legenda clicável para Surface
     for trace in fig.data:
         trace.showlegend = True

@@ -27,17 +27,43 @@ class ToolTip:
         if self.tipwindow or not self.text:
             return
         x, y = self.widget.winfo_pointerxy()
-        self.tipwindow = tw = tk.Toplevel(self.widget)
+        tw = tk.Toplevel(self.widget)
         tw.wm_overrideredirect(True)
-        tw.wm_geometry(f"+{x+20}+{y+20}")
+        # Cria label para medir tamanho
         label = tk.Label(tw, text=self.text, justify='left', background="#ffffe0",
                          relief='solid', borderwidth=1, font=("Segoe UI", 10))
         label.pack(ipadx=6, ipady=2)
+        tw.update_idletasks()
+        # Calcula posição para não sair da tela
+        screen_w = tw.winfo_screenwidth()
+        screen_h = tw.winfo_screenheight()
+        tip_w = tw.winfo_width()
+        tip_h = tw.winfo_height()
+        pos_x = x + 20
+        pos_y = y + 20
+        if pos_x + tip_w > screen_w:
+            pos_x = x - tip_w - 10
+        if pos_y + tip_h > screen_h:
+            pos_y = y - tip_h - 10
+        tw.wm_geometry(f"+{pos_x}+{pos_y}")
+        self.tipwindow = tw
 
     def move_tip(self, event):
         if self.tipwindow:
             x, y = self.widget.winfo_pointerxy()
-            self.tipwindow.wm_geometry(f"+{x+20}+{y+20}")
+            tw = self.tipwindow
+            tw.update_idletasks()
+            screen_w = tw.winfo_screenwidth()
+            screen_h = tw.winfo_screenheight()
+            tip_w = tw.winfo_width()
+            tip_h = tw.winfo_height()
+            pos_x = x + 20
+            pos_y = y + 20
+            if pos_x + tip_w > screen_w:
+                pos_x = x - tip_w - 10
+            if pos_y + tip_h > screen_h:
+                pos_y = y - tip_h - 10
+            tw.wm_geometry(f"+{pos_x}+{pos_y}")
 
     def hide_tip(self, event=None):
         if self._after_id:
@@ -210,15 +236,10 @@ class App(tb.Window):
 
     def _organizar_arquivos_thread(self, pasta):
         print(f'Iniciando organização dos arquivos em: {pasta}')
-        resultado = fn.organizar_arquivos_por_padrao(pasta)
-        if resultado:
-            print('Organização concluída!')
-            self.after(0, lambda: messagebox.showinfo(
-                "Concluído", "Arquivos organizados com sucesso!"))
-        else:
-            print('Nenhum arquivo encontrado para organizar.')
-            self.after(0, lambda: messagebox.showinfo(
-                "Nada a organizar", "Nenhum arquivo encontrado para organizar na pasta selecionada."))
+        fn.organizar_arquivos_por_padrao(pasta)
+        print('Organização concluída!')
+        self.after(0, lambda: messagebox.showinfo(
+            "Concluído", "Arquivos organizados com sucesso!"))
 
     def extrair_coordenadas(self):
         if not messagebox.askyesno(
@@ -260,8 +281,10 @@ class App(tb.Window):
         if pasta:
             df = fn.extrair_coordenadas_e_valores_espd(pasta)
             if not df.empty:
+                metodo = self.interpolar_var.get()
+                print(f"Método de interpolação selecionado: {metodo}")
                 fn.plotar_surface_ppfd(
-                    df=df, usar_ppfd=self.usar_ppfd.get(), interpolar=self.interpolar_var.get())
+                    df, self.usar_ppfd.get(), metodo)
             else:
                 messagebox.showwarning(
                     "Aviso", "Nenhum dado encontrado na pasta selecionada. Garanta que foi selecionado uma pasta com arquivos válidos.")
@@ -280,8 +303,10 @@ class App(tb.Window):
                     dfs.append(df)
                     nomes.append(os.path.basename(subpasta))
             if dfs:
+                metodo = self.interpolar_var.get()
+                print(f"Método de interpolação selecionado: {metodo}")
                 fn.plotar_multiple_surface_ppfd(
-                    dfs, nomes, usar_ppfd=self.usar_ppfd.get(), interpolar=self.interpolar_var.get())
+                    dfs, nomes, self.usar_ppfd.get(), metodo)
             else:
                 messagebox.showwarning(
                     "Aviso", "Nenhum dado encontrado nas subpastas. Garanta que foi escolhida uma pasta que contenha as subpastas com arquivos válidos.")
