@@ -5,6 +5,10 @@ import pandas as pd
 import plotly.graph_objects as go
 import numpy as np
 from scipy.interpolate import griddata
+import tkinter as tk
+from tkinter import filedialog, messagebox
+import plotly.io as pio
+import webbrowser
 
 
 def organizar_arquivos_por_padrao(pasta: str) -> None:
@@ -168,13 +172,24 @@ def plotar_3d_ppfd(df: pd.DataFrame, usar_ppfd: bool = True) -> None:
             )
         )])
 
+        axis_style = dict(
+            showbackground=True,
+            showgrid=True,
+            zeroline=True,
+            showticklabels=True,
+            title=''
+        )
+
         fig.update_layout(
             scene=dict(
                 xaxis_title='Linha (X)',
                 yaxis_title='Coluna (Y)',
                 zaxis_title=z_label
             ),
-            title=f'Distribuição 3D de {z_label}'
+            title=f'Distribuição 3D de {z_label}',
+            font=dict(family='Segoe UI, Segoe, Arial', size=14),
+            template='plotly_white',
+            hovermode='closest',
         )
 
         fig.update_layout(scene_camera_eye=dict(x=2, y=-2, z=2.0))
@@ -212,6 +227,14 @@ def plotar_surface_ppfd(df: pd.DataFrame, usar_ppfd: bool = True, interpolar: st
         xi, yi = np.meshgrid(xi, yi)
         zi = griddata((x, y), z, (xi, yi), method=interpolar)
 
+        axis_style = dict(
+            showbackground=False,
+            showgrid=True,
+            zeroline=True,
+            showticklabels=True,
+            title=''
+        )
+
         fig = go.Figure(data=[
             go.Surface(
                 x=xi,
@@ -226,14 +249,6 @@ def plotar_surface_ppfd(df: pd.DataFrame, usar_ppfd: bool = True, interpolar: st
             )
         ])
 
-        axis_style = dict(
-            showbackground=False,
-            showgrid=True,
-            zeroline=True,
-            showticklabels=True,
-            title=''
-        )
-
         fig.update_layout(
             scene=dict(
                 xaxis_title='Linha (X)',
@@ -241,6 +256,9 @@ def plotar_surface_ppfd(df: pd.DataFrame, usar_ppfd: bool = True, interpolar: st
                 zaxis_title=z_label
             ),
             title=f'Surface Plot 3D Interpolado de {z_label} ({interpolar})',
+            font=dict(family='Segoe UI, Segoe, Arial', size=14),
+            template='plotly_white',
+            hovermode='closest',
         )
 
         fig.update_layout(scene_camera_eye=dict(x=2, y=-2, z=0.7))
@@ -254,40 +272,20 @@ def plotar_surface_ppfd(df: pd.DataFrame, usar_ppfd: bool = True, interpolar: st
 def plotar_multiple_surface_ppfd(dfs: list, nomes: list, usar_ppfd: bool = True, interpolar: str = 'cubic') -> None:
     """
     Plota múltiplas superfícies 3D interpoladas de PPFD ou PFD em um único gráfico Plotly.
-    O argumento 'interpolar' define o método de interpolação do griddata ('cubic', 'linear', 'nearest').
-
-    Args:
-        dfs (list of pd.DataFrame): Lista de DataFrames, um para cada superfície.
-        nomes (list of str): Lista de nomes para cada superfície (usado na legenda e hover).
-        usar_ppfd (bool, opcional): Se True, plota PPFD; se False, plota PFD. Padrão é True.
-        interpolar (str, opcional): Método de interpolação. Padrão é 'cubic'.
-
-    Exemplo:
-        plotar_multiple_surface_ppfd([df1, df2], ['Pasta1', 'Pasta2'], usar_ppfd=True, interpolar='linear')
+    Permite seleção dinâmica dos grupos (superfícies) via checkboxes na página HTML, igual à função plot_spectral.
     """
     try:
-        fig = go.Figure()
         # Paletas de degradê personalizadas conforme solicitado
         cores_por_nome = {
-            # Roxo degradê
             '99100': [[0, 'rgb(120,81,169)'], [1, 'rgb(186,104,200)']],
-            # Roxo degradê
             '0T':    [[0, 'rgb(103,58,183)'], [1, 'rgb(179,136,255)']],
-            # Cinza degradê
             '100B':  [[0, 'rgb(80,80,80)'], [1, 'rgb(220,220,220)']],
-            # Cinza degradê
             '0B':    [[0, 'rgb(120,120,120)'], [1, 'rgb(240,240,240)']],
-            # Vermelho degradê
             '100V':  [[0, 'rgb(183,28,28)'], [1, 'rgb(255,138,128)']],
-            # Vermelho degradê
             '0V':    [[0, 'rgb(229,57,53)'], [1, 'rgb(255,205,210)']],
-            # Azul degradê
             '100A':  [[0, 'rgb(13,71,161)'], [1, 'rgb(100,181,246)']],
-            # Azul degradê
             '0A':    [[0, 'rgb(21,101,192)'], [1, 'rgb(144,202,249)']]
         }
-
-        # Mapeamento dos nomes para exibição no hover
         nomes_legenda = {
             '99100': 'RBW100%',
             '0T':    'RBW15%',
@@ -305,15 +303,15 @@ def plotar_multiple_surface_ppfd(dfs: list, nomes: list, usar_ppfd: bool = True,
                     return cores
             return [[0, 'rgb(200,200,200)'], [1, 'rgb(80,80,80)']]
 
-        def nome_hover(nome):
+        def nome_legenda_grupo(nome):
             for chave, valor in nomes_legenda.items():
                 if chave in nome:
                     return valor
             return nome
-
         z_col = 'PPFD' if usar_ppfd else 'PFD'
         z_label = 'PPFD (umol m⁻² s⁻¹)' if usar_ppfd else 'PFD (umol m⁻² s⁻¹)'
-
+        fig = go.Figure()
+        grupos_legenda = []
         for idx, (df, nome) in enumerate(zip(dfs, nomes)):
             x = df['linha']
             y = df['coluna']
@@ -322,7 +320,8 @@ def plotar_multiple_surface_ppfd(dfs: list, nomes: list, usar_ppfd: bool = True,
             yi = np.linspace(y.min(), y.max(), 50)
             xi, yi = np.meshgrid(xi, yi)
             zi = griddata((x, y), z, (xi, yi), method=interpolar)
-            nome_legenda = nome_hover(nome)
+            nome_leg = nome_legenda_grupo(nome)
+            grupos_legenda.append(nome_leg)
             fig.add_trace(go.Surface(
                 x=xi,
                 y=yi,
@@ -333,31 +332,13 @@ def plotar_multiple_surface_ppfd(dfs: list, nomes: list, usar_ppfd: bool = True,
                 contours={
                     "z": {"show": True, "usecolormap": True, "highlightcolor": "limegreen", "project_z": True}
                 },
-                name=nome_legenda,
+                name=nome_leg,
+                legendgroup=nome_leg,
                 opacity=0.8,
                 showscale=(idx == 0),
-                hovertemplate=f"{nome_legenda}<br>Linha (Y): %{{y}}<br>Coluna (X): %{{x}}<br>{z_label}: %{{z:.2f}}<extra></extra>",
+                hovertemplate=f"{nome_leg}<br>Linha (Y): %{{y}}<br>Coluna (X): %{{x}}<br>{z_label}: %{{z:.2f}}<extra></extra>",
                 visible=True
             ))
-
-        axis_style = dict(
-            showbackground=False,
-            showgrid=True,
-            zeroline=True,
-            showticklabels=True,
-            title=''
-        )
-
-        # Cria frames para rotação automática (60fps, 1 minuto, 3 voltas)
-        total_frames = 1200
-        frames = []
-        for i, angle in enumerate(np.linspace(0, 1080, total_frames)):
-            frames.append(go.Frame(layout=dict(
-                scene_camera_eye=dict(
-                    x=2*np.cos(np.radians(angle)), y=2*np.sin(np.radians(angle)), z=0.7)
-            )))
-        fig.frames = frames
-
         fig.update_layout(
             scene=dict(
                 xaxis_title='Linha (X)',
@@ -365,24 +346,168 @@ def plotar_multiple_surface_ppfd(dfs: list, nomes: list, usar_ppfd: bool = True,
                 zaxis_title=z_label,
                 camera_eye=dict(x=2, y=-2, z=0.7)
             ),
-            title=f'Múltiplas Superfícies 3D Interpoladas de {z_label} ({interpolar})',
-            legend=dict(
-                title="Superfícies",
-                itemsizing='constant',
-                x=0,
-                y=0.5,
-                xanchor='left',
-                yanchor='middle'
-            ),
+            title='',
+            legend_title_text='Grupo',
+            font=dict(family='Segoe UI, Segoe, Arial', size=14),
+            template='plotly_white',
+            hovermode='closest',
             uirevision='manter_rotacao',
         )
+        # Gera HTML com checkboxes para grupos (usando nomes amigáveis) - lista horizontal acima do gráfico
+        grupos_ordenados = sorted(set(grupos_legenda))
+        checkboxes = "".join([
+            f'<label style="margin-right:18px;font-family:Segoe UI,Segoe,Arial;font-size:15px;"><input type="checkbox" class="grupo-cb" value="{g}" checked> {g}</label>'
+            for g in grupos_ordenados
+        ])
+        js = '''<script>
+        function updateGroups() {
+            var checked = Array.from(document.querySelectorAll('.grupo-cb:checked')).map(cb => cb.value);
+            var plot = document.querySelector('.js-plotly-plot');
+            var update = {visible: []};
+            var data = plot.data;
+            for (var i = 0; i < data.length; i++) {
+                var grupo = data[i].legendgroup;
+                update.visible.push(checked.includes(grupo));
+            }
+            Plotly.update(plot, update, {});
+        }
+        document.querySelectorAll('.grupo-cb').forEach(cb => cb.addEventListener('change', updateGroups));
+        </script>'''
 
-        # Ativa a legenda clicável para Surface
-        for trace in fig.data:
-            trace.showlegend = True
-            trace.legendgroup = trace.name
+        html = pio.to_html(fig, include_plotlyjs='cdn',
+                           full_html=False, config={"displayModeBar": True})
+        html_final = f"""
+        <html><head><meta charset='utf-8'><title>Múltiplas Superfícies 3D</title></head><body style='font-family:Segoe UI,Segoe,Arial;'>
+        <h2 style='font-family:Segoe UI,Segoe,Arial;'>Múltiplas Superfícies 3D Interpoladas ({interpolar})</h2>
+        <div style='margin-bottom:12px;'>{checkboxes}</div>
+        {html}
+        {js}
+        </body></html>
+        """
 
-        fig.show()
+        saida = os.path.join(os.getcwd(), "multiplas_surfaces_interativo.html")
+        with open(saida, 'w', encoding='utf-8') as f:
+            f.write(html_final)
+        webbrowser.open('file://' + os.path.abspath(saida))
     except Exception as e:
         print(f'Erro ao plotar múltiplas superfícies: {e}')
         raise
+
+
+def plot_spectral():
+    """
+    Permite ao usuário selecionar uma pasta principal, busca recursivamente todos os arquivos uMOL_*.txt nas subpastas,
+    plota todas as curvas em um único gráfico interativo com Plotly, e permite selecionar quais subpastas visualizar via checkboxes na própria página HTML.
+    """
+
+    root = tk.Tk()
+    root.withdraw()
+    pasta_principal = filedialog.askdirectory(
+        title="Selecione a pasta principal com subpastas contendo arquivos uMOL_*")
+    if not pasta_principal:
+        messagebox.showwarning("Aviso", "Nenhuma pasta selecionada.")
+        return
+    arquivos_umol = []
+    grupos = []
+    for dirpath, _, filenames in os.walk(pasta_principal):
+        subpasta = os.path.relpath(dirpath, pasta_principal)
+        if subpasta == ".":
+            continue
+        for f in filenames:
+            if f.startswith('uMOL_') and f.endswith('.txt'):
+                arquivos_umol.append(os.path.join(dirpath, f))
+                grupos.append(subpasta)
+    if not arquivos_umol:
+        messagebox.showwarning(
+            "Aviso", "Nenhum arquivo uMOL_*.txt encontrado nas subpastas.")
+        return
+    # Mapeamento dos nomes para exibição amigável
+    nomes_legenda = {
+        '99100': 'RBW100%',
+        '0T':    'RBW15%',
+        '100V':  'R100%',
+        '100B':  'W100%',
+        '100A':  'B100%',
+        '0V':    'R15%',
+        '0B':    'W15%',
+        '0A':    'B15%'
+    }
+    fig = go.Figure()
+    grupo_set = set()
+    grupo_legenda_map = {}
+    for arquivo, grupo in zip(arquivos_umol, grupos):
+        try:
+            try:
+                df = pd.read_csv(arquivo, sep='\t|\s+',
+                                 engine='python', comment='#')
+            except Exception as e:
+                messagebox.showwarning(
+                    "Aviso", f"O arquivo {os.path.basename(arquivo)} não pôde ser lido como CSV padrão (tab ou espaço).")
+                continue
+            if 'Wavelength(nm)' not in df.columns or not any('PFD' in col and 'umol' in col for col in df.columns):
+                messagebox.showwarning(
+                    "Aviso", f"O arquivo {os.path.basename(arquivo)} não segue o padrão esperado de colunas ('Wavelength(nm)' e 'PFD ... umol').")
+                continue
+            col_wave = 'Wavelength(nm)'
+            col_pfd = None
+            for col in df.columns:
+                if 'PFD' in col and 'umol' in col:
+                    col_pfd = col
+            if col_wave not in df.columns or col_pfd is None:
+                continue
+            x = df[col_wave].values
+            y = df[col_pfd].values
+            if len(x) == 0 or len(y) == 0:
+                continue
+            nome_legenda = nomes_legenda.get(grupo, grupo)
+            fig.add_trace(go.Scatter(x=x, y=y, mode='lines', name=f"{nome_legenda}", legendgroup=nome_legenda, visible=True,
+                                     customdata=[[nome_legenda]]*len(x),
+                                     hovertemplate=f"Grupo: {nome_legenda}<br>Arquivo: {os.path.basename(arquivo)}<br>Wavelength: %{{x}}<br>PFD: %{{y}}<extra></extra>"))
+            grupo_set.add(grupo)
+            grupo_legenda_map[grupo] = nome_legenda
+        except Exception as e:
+            print(f'Erro ao ler {arquivo}: {e}')
+    fig.update_layout(
+        title='',
+        xaxis_title='Wavelength (nm)',
+        yaxis_title='PFD (μmol m⁻² s⁻¹)',
+        hovermode='closest',
+        template='plotly_white',
+        legend_title_text='Grupo',
+        font=dict(family='Segoe UI, Segoe, Arial', size=14)
+    )
+    # Gera HTML com checkboxes para grupos (usando nomes amigáveis) - agora acima do gráfico, em linha
+    grupos_ordenados = sorted(grupo_set, key=lambda g: nomes_legenda.get(g, g))
+    checkboxes = "".join([
+        f'<label style="margin-right:18px;font-family:Segoe UI,Segoe,Arial;font-size:15px;"><input type="checkbox" class="grupo-cb" value="{nomes_legenda.get(g, g)}" checked> {nomes_legenda.get(g, g)}</label>'
+        for g in grupos_ordenados
+    ])
+    js = '''<script>
+    function updateGroups() {
+        var checked = Array.from(document.querySelectorAll('.grupo-cb:checked')).map(cb => cb.value);
+        var plot = document.querySelector('.js-plotly-plot');
+        var update = {visible: []};
+        var data = plot.data;
+        for (var i = 0; i < data.length; i++) {
+            var grupo = data[i].legendgroup;
+            update.visible.push(checked.includes(grupo));
+        }
+        Plotly.update(plot, update, {});
+    }
+    document.querySelectorAll('.grupo-cb').forEach(cb => cb.addEventListener('change', updateGroups));
+    </script>'''
+    html = pio.to_html(fig, include_plotlyjs='cdn',
+                       full_html=False, config={"displayModeBar": True})
+    html_final = f"""
+    <html><head><meta charset='utf-8'><title>Espectros uMOL_ por grupo</title></head><body style='font-family:Segoe UI,Segoe,Arial;'>
+    <h2 style='font-family:Segoe UI,Segoe,Arial;'>Espectros de arquivos uMOL</h2>
+    <div style='margin-bottom:12px;'>{checkboxes}</div>
+    {html}
+    {js}
+    </body></html>
+    """
+    saida = os.path.join(pasta_principal, "espectros_umol_interativo.html")
+    with open(saida, 'w', encoding='utf-8') as f:
+        f.write(html_final)
+    import webbrowser
+    webbrowser.open('file://' + os.path.abspath(saida))

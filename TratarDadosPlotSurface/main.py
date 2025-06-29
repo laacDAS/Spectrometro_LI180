@@ -176,6 +176,11 @@ class App(tb.Window):
         btn_mult.pack(pady=4, padx=8)
         ToolTip(
             btn_mult, "Plota múltiplas superfícies 3D para todas as subpastas encontradas.")
+        btn_umol = tb.Button(frame_plot, text="Plotar espectros uMOL", width=28, bootstyle=PRIMARY,
+                             command=fn.plot_spectral)
+        btn_umol.pack(pady=4, padx=8)
+        ToolTip(
+            btn_umol, "Seleciona a pasta principal e plota todos os espectros de arquivos uMOL_ encontrados nas subpastas (Plotly)")
 
     def _create_opcoes_graficos(self, parent):
         frame_opts = tb.Labelframe(
