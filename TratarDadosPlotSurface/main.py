@@ -80,7 +80,6 @@ class App(tb.Window):
         self.title("Trabalhar dados do LI-180 | Platar pontos")
         self.resizable(True, True)
         self.usar_ppfd = tb.BooleanVar(value=True)
-        self._setup_terminal()
         self._create_main_interface()
         self.update_idletasks()
         self.geometry("")  # Ajusta ao conteúdo
@@ -107,7 +106,7 @@ class App(tb.Window):
             bottom_btn_frame, text="Ajuda", bootstyle=INFO, command=self.open_help_window)
         help_button.pack(side='left', padx=(0, 12))
         sair_button = tb.Button(
-            bottom_btn_frame, text="Sair", width=18, bootstyle=DANGER, command=self.quit)
+            bottom_btn_frame, text="Sair", width=18, bootstyle=DANGER, command=self.confirmar_sair)
         sair_button.pack(side='left')
 
     def open_help_window(self):
@@ -137,20 +136,6 @@ class App(tb.Window):
                 return f.read()
         except Exception as e:
             return f"Não foi possível carregar o arquivo de ajuda.\n\nErro: {e}"
-
-    def _setup_terminal(self):
-        self.terminal_frame = tb.Frame(self)
-        self.terminal_frame.place_forget()
-        sys.stdout = sys.__stdout__
-
-    def write(self, msg):
-        pass
-
-    def flush(self):
-        pass
-
-    def log(self, msg):
-        pass
 
     def _create_widgets(self, parent):
         self._create_organizacao_extracao(parent)
@@ -235,11 +220,16 @@ class App(tb.Window):
                              args=(pasta,), daemon=True).start()
 
     def _organizar_arquivos_thread(self, pasta):
-        print(f'Iniciando organização dos arquivos em: {pasta}')
-        fn.organizar_arquivos_por_padrao(pasta)
-        print('Organização concluída!')
-        self.after(0, lambda: messagebox.showinfo(
-            "Concluído", "Arquivos organizados com sucesso!"))
+        try:
+            print(f'Iniciando organização dos arquivos em: {pasta}')
+            fn.organizar_arquivos_por_padrao(pasta)
+            print('Organização concluída!')
+            self.after(0, lambda: messagebox.showinfo(
+                "Concluído", "Arquivos organizados com sucesso!"))
+        except Exception as e:
+            print(f'Erro ao organizar arquivos: {e}')
+            self.after(0, lambda: messagebox.showerror(
+                "Erro ao organizar arquivos", str(e)))
 
     def extrair_coordenadas(self):
         if not messagebox.askyesno(
@@ -252,64 +242,85 @@ class App(tb.Window):
                 pasta_principal,), daemon=True).start()
 
     def _extrair_coordenadas_thread(self, pasta_principal):
-        print(f'Iniciando extração nas subpastas de: {pasta_principal}')
-        subpastas = [os.path.join(pasta_principal, p) for p in os.listdir(pasta_principal)
-                     if os.path.isdir(os.path.join(pasta_principal, p))]
-        for subpasta in subpastas:
-            print(f'Extraindo: {os.path.basename(subpasta)}')
-            df = fn.extrair_coordenadas_e_valores_espd(
-                subpasta, salvar_csv=True)
-            print(str(df))
-        print('Extração finalizada!')
-        self.after(0, lambda: messagebox.showinfo(
-            "Concluído", "Extração finalizada. Veja o terminal para detalhes."))
+        try:
+            print(f'Iniciando extração nas subpastas de: {pasta_principal}')
+            subpastas = [os.path.join(pasta_principal, p) for p in os.listdir(pasta_principal)
+                         if os.path.isdir(os.path.join(pasta_principal, p))]
+            for subpasta in subpastas:
+                print(f'Extraindo: {os.path.basename(subpasta)}')
+                df = fn.extrair_coordenadas_e_valores_espd(
+                    subpasta, salvar_csv=True)
+                print(str(df))
+            print('Extração finalizada!')
+            self.after(0, lambda: messagebox.showinfo(
+                "Concluído", "Extração finalizada. Veja o terminal para detalhes."))
+        except Exception as e:
+            print(f'Erro ao extrair coordenadas: {e}')
+            self.after(0, lambda: messagebox.showerror(
+                "Erro ao extrair coordenadas e valores", str(e)))
 
     def plotar_3d_simples(self):
         pasta = filedialog.askdirectory(
             title="Selecione a pasta para gráfico 3D PPFD/PFD")
         if pasta:
-            df = fn.extrair_coordenadas_e_valores_espd(pasta)
-            if not df.empty:
-                fn.plotar_3d_ppfd(df=df, usar_ppfd=self.usar_ppfd.get())
-            else:
-                messagebox.showwarning(
-                    "Aviso", "Nenhum dado encontrado na pasta selecionada. Garanta que foi selecionado uma pasta com arquivos válidos.")
+            try:
+                df = fn.extrair_coordenadas_e_valores_espd(pasta)
+                if not df.empty:
+                    fn.plotar_3d_ppfd(df=df, usar_ppfd=self.usar_ppfd.get())
+                else:
+                    messagebox.showwarning(
+                        "Aviso", "Nenhum dado encontrado na pasta selecionada. Garanta que foi selecionado uma pasta com arquivos válidos.")
+            except Exception as e:
+                messagebox.showerror(
+                    "Erro ao plotar gráfico 3D de pontos", str(e))
 
     def plotar_surface(self):
         pasta = filedialog.askdirectory(
             title="Selecione a pasta para Surface Plot 3D PPFD/PFD")
         if pasta:
-            df = fn.extrair_coordenadas_e_valores_espd(pasta)
-            if not df.empty:
-                metodo = self.interpolar_var.get()
-                print(f"Método de interpolação selecionado: {metodo}")
-                fn.plotar_surface_ppfd(
-                    df, self.usar_ppfd.get(), metodo)
-            else:
-                messagebox.showwarning(
-                    "Aviso", "Nenhum dado encontrado na pasta selecionada. Garanta que foi selecionado uma pasta com arquivos válidos.")
+            try:
+                df = fn.extrair_coordenadas_e_valores_espd(pasta)
+                if not df.empty:
+                    metodo = self.interpolar_var.get()
+                    print(f"Método de interpolação selecionado: {metodo}")
+                    fn.plotar_surface_ppfd(
+                        df, self.usar_ppfd.get(), metodo)
+                else:
+                    messagebox.showwarning(
+                        "Aviso", "Nenhum dado encontrado na pasta selecionada. Garanta que foi selecionado uma pasta com arquivos válidos.")
+            except Exception as e:
+                messagebox.showerror(
+                    "Erro ao plotar superfície", str(e))
 
     def plotar_multiplas_surfaces(self):
         pasta_principal = filedialog.askdirectory(
             title="Selecione a pasta principal com as subpastas ESPD")
         if pasta_principal:
-            subpastas = [os.path.join(pasta_principal, p) for p in os.listdir(pasta_principal)
-                         if os.path.isdir(os.path.join(pasta_principal, p))]
-            dfs = []
-            nomes = []
-            for subpasta in subpastas:
-                df = fn.extrair_coordenadas_e_valores_espd(subpasta)
-                if not df.empty:
-                    dfs.append(df)
-                    nomes.append(os.path.basename(subpasta))
-            if dfs:
-                metodo = self.interpolar_var.get()
-                print(f"Método de interpolação selecionado: {metodo}")
-                fn.plotar_multiple_surface_ppfd(
-                    dfs, nomes, self.usar_ppfd.get(), metodo)
-            else:
-                messagebox.showwarning(
-                    "Aviso", "Nenhum dado encontrado nas subpastas. Garanta que foi escolhida uma pasta que contenha as subpastas com arquivos válidos.")
+            try:
+                subpastas = [os.path.join(pasta_principal, p) for p in os.listdir(pasta_principal)
+                             if os.path.isdir(os.path.join(pasta_principal, p))]
+                dfs = []
+                nomes = []
+                for subpasta in subpastas:
+                    df = fn.extrair_coordenadas_e_valores_espd(subpasta)
+                    if not df.empty:
+                        dfs.append(df)
+                        nomes.append(os.path.basename(subpasta))
+                if dfs:
+                    metodo = self.interpolar_var.get()
+                    print(f"Método de interpolação selecionado: {metodo}")
+                    fn.plotar_multiple_surface_ppfd(
+                        dfs, nomes, self.usar_ppfd.get(), metodo)
+                else:
+                    messagebox.showwarning(
+                        "Aviso", "Nenhum dado encontrado nas subpastas. Garanta que foi escolhida uma pasta que contenha as subpastas com arquivos válidos.")
+            except Exception as e:
+                messagebox.showerror(
+                    "Erro ao plotar múltiplas superfícies", str(e))
+
+    def confirmar_sair(self):
+        if messagebox.askyesno("Confirmação", "Deseja realmente sair do programa?"):
+            self.quit()
 
 
 if __name__ == "__main__":
