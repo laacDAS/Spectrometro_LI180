@@ -5,6 +5,39 @@ from ttkbootstrap.constants import *
 from tkinter import filedialog, messagebox, ttk, scrolledtext
 import sys
 import threading
+import tkinter as tk
+
+
+class ToolTip:
+    def __init__(self, widget, text):
+        self.widget = widget
+        self.text = text
+        self.tipwindow = None
+        self.widget.bind("<Enter>", self.show_tip)
+        self.widget.bind("<Leave>", self.hide_tip)
+        self.widget.bind("<Motion>", self.move_tip)
+        self._last_xy = (0, 0)
+
+    def show_tip(self, event=None):
+        if self.tipwindow or not self.text:
+            return
+        x, y = self.widget.winfo_pointerxy()
+        self.tipwindow = tw = tk.Toplevel(self.widget)
+        tw.wm_overrideredirect(True)
+        tw.wm_geometry(f"+{x+20}+{y+20}")
+        label = tk.Label(tw, text=self.text, justify='left', background="#ffffe0",
+                         relief='solid', borderwidth=1, font=("Segoe UI", 10))
+        label.pack(ipadx=6, ipady=2)
+
+    def move_tip(self, event):
+        if self.tipwindow:
+            x, y = self.widget.winfo_pointerxy()
+            self.tipwindow.wm_geometry(f"+{x+20}+{y+20}")
+
+    def hide_tip(self, event=None):
+        if self.tipwindow:
+            self.tipwindow.destroy()
+            self.tipwindow = None
 
 
 class App(tb.Window):
@@ -27,9 +60,11 @@ class App(tb.Window):
         help_button = tb.Button(
             bottom_btn_frame, text="Ajuda", bootstyle=INFO, command=self.open_help_window)
         help_button.pack(side='left', padx=(0, 12))
+        ToolTip(help_button, "Abre o guia de uso e instruções detalhadas do sistema.")
         sair_button = tb.Button(
             bottom_btn_frame, text="Sair", width=18, bootstyle=DANGER, command=self.quit)
         sair_button.pack(side='left')
+        ToolTip(sair_button, "Fecha o programa.")
 
     def open_help_window(self):
         help_win = tb.Toplevel(self)
@@ -83,21 +118,35 @@ class App(tb.Window):
         frame_acao = tb.Labelframe(
             parent, text="Organização e extração", bootstyle="info")
         frame_acao.pack(pady=(18, 10), padx=18, fill='x')
-        tb.Button(frame_acao, text="Organizar arquivos", width=28, bootstyle=PRIMARY,
-                  command=self.organizar_arquivos).pack(pady=4, padx=8)
-        tb.Button(frame_acao, text="Extrair coordenadas e valores", width=28, bootstyle=PRIMARY,
-                  command=self.extrair_coordenadas).pack(pady=4, padx=8)
+        btn_org = tb.Button(frame_acao, text="Organizar arquivos", width=28, bootstyle=PRIMARY,
+                            command=self.organizar_arquivos)
+        btn_org.pack(pady=4, padx=8)
+        ToolTip(btn_org, "Move arquivos para subpastas conforme o padrão de nome. Use após copiar arquivos do LI-180.")
+        btn_ext = tb.Button(frame_acao, text="Extrair coordenadas e valores", width=28, bootstyle=PRIMARY,
+                            command=self.extrair_coordenadas)
+        btn_ext.pack(pady=4, padx=8)
+        ToolTip(
+            btn_ext, "Extrai coordenadas e valores dos arquivos nas subpastas e gera arquivos CSV.")
 
     def _create_plotagem(self, parent):
         frame_plot = tb.Labelframe(
             parent, text="Plotagem de gráficos", bootstyle="info")
         frame_plot.pack(pady=4, padx=18, fill='x')
-        tb.Button(frame_plot, text="Gráfico 3D de pontos", width=28, bootstyle=PRIMARY,
-                  command=self.plotar_3d_simples).pack(pady=4, padx=8)
-        tb.Button(frame_plot, text="Gráfico 3D de superfície", width=28, bootstyle=PRIMARY,
-                  command=self.plotar_surface).pack(pady=4, padx=8)
-        tb.Button(frame_plot, text="Gráfico 3D com múltiplas superfícies", width=28, bootstyle=PRIMARY,
-                  command=self.plotar_multiplas_surfaces).pack(pady=4, padx=8)
+        btn_pontos = tb.Button(frame_plot, text="Gráfico 3D de pontos", width=28, bootstyle=PRIMARY,
+                               command=self.plotar_3d_simples)
+        btn_pontos.pack(pady=4, padx=8)
+        ToolTip(
+            btn_pontos, "Plota um gráfico 3D de pontos com os dados extraídos da pasta selecionada.")
+        btn_surface = tb.Button(frame_plot, text="Gráfico 3D de superfície", width=28, bootstyle=PRIMARY,
+                                command=self.plotar_surface)
+        btn_surface.pack(pady=4, padx=8)
+        ToolTip(
+            btn_surface, "Plota uma superfície 3D interpolada para os dados da pasta selecionada.")
+        btn_mult = tb.Button(frame_plot, text="Gráfico 3D com múltiplas superfícies", width=28, bootstyle=PRIMARY,
+                             command=self.plotar_multiplas_surfaces)
+        btn_mult.pack(pady=4, padx=8)
+        ToolTip(
+            btn_mult, "Plota múltiplas superfícies 3D para todas as subpastas encontradas.")
 
     def _create_opcoes_graficos(self, parent):
         frame_opts = tb.Labelframe(
