@@ -5,10 +5,19 @@ import pandas as pd
 import plotly.graph_objects as go
 import numpy as np
 from scipy.interpolate import griddata
+from scipy.signal import find_peaks
 import tkinter as tk
 from tkinter import filedialog, messagebox
 import plotly.io as pio
 import webbrowser
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from matplotlib.collections import LineCollection
+from matplotlib.colors import Normalize
+from matplotlib.colors import ListedColormap
+from tkinter import filedialog, messagebox, ttk
+import matplotlib.cm as cm
+import math
 
 
 def organizar_arquivos_por_padrao(pasta: str) -> None:
@@ -438,9 +447,9 @@ def plot_spectral():
     for arquivo, grupo in zip(arquivos_umol, grupos):
         try:
             try:
-                df = pd.read_csv(arquivo, sep='\t|\s+',
+                df = pd.read_csv(arquivo, sep=r'\t|\s+',
                                  engine='python', comment='#')
-            except Exception as e:
+            except pd.errors.ParserError:
                 messagebox.showwarning(
                     "Aviso", f"O arquivo {os.path.basename(arquivo)} não pôde ser lido como CSV padrão (tab ou espaço).")
                 continue
@@ -463,6 +472,21 @@ def plot_spectral():
             fig.add_trace(go.Scatter(x=x, y=y, mode='lines', name=f"{nome_legenda}", legendgroup=nome_legenda, visible=True,
                                      customdata=[[nome_legenda]]*len(x),
                                      hovertemplate=f"Grupo: {nome_legenda}<br>Arquivo: {os.path.basename(arquivo)}<br>Wavelength: %{{x}}<br>PFD: %{{y}}<extra></extra>"))
+            # Detecção de picos usando scipy.signal.find_peaks
+            try:
+                peaks, _ = find_peaks(y, prominence=0.05 * np.max(y))
+                if len(peaks) > 0:
+                    fig.add_trace(go.Scatter(
+                        x=x[peaks], y=y[peaks],
+                        mode='markers',
+                        marker=dict(symbol='x', size=10, color='red'),
+                        name=f"Picos {nome_legenda}",
+                        legendgroup=nome_legenda,
+                        showlegend=False,
+                        hovertemplate=f"<b>Pico</b><br>Grupo: {nome_legenda}<br>Arquivo: {os.path.basename(arquivo)}<br>Wavelength: %{{x}}<br>PFD: %{{y}}<extra></extra>"
+                    ))
+            except Exception as e:
+                print(f"Erro ao detectar picos em {arquivo}: {e}")
             grupo_set.add(grupo)
             grupo_legenda_map[grupo] = nome_legenda
         except Exception as e:
@@ -509,5 +533,188 @@ def plot_spectral():
     saida = os.path.join(pasta_principal, "espectros_umol_interativo.html")
     with open(saida, 'w', encoding='utf-8') as f:
         f.write(html_final)
-    import webbrowser
     webbrowser.open('file://' + os.path.abspath(saida))
+
+
+def plot_spectral_matplotlib():
+    """
+    Plota todos os espectros uMOL_ encontrados nas subpastas, usando matplotlib,
+    com linhas multicoloridas conforme o comprimento de onda (Wavelength),
+    exibindo todos os grupos em subplots (painéis) em uma única janela.
+    Não exibe colorbar. O label do eixo Y aparece apenas na primeira coluna, e o do eixo X apenas na última linha.
+    O eixo X vai de 380 a 780 nm, com marcação a cada 50 nm.
+    As cores seguem o degradê espectral solicitado.
+    Layout ajustado conforme solicitado.
+    """
+
+    # Função para mapear comprimento de onda para cor RGB com degradê suave entre as faixas
+    def wavelength_to_rgb(wavelength):
+        # Pontos de transição (nm) e cores principais (R, G, B)
+        color_points = [
+            (380, (0.56, 0.0, 1.0)),    # Violeta
+            (440, (0.0, 0.3, 1.0)),     # Azul
+            (485, (0.0, 0.8, 0.8)),     # Ciano
+            (500, (0.0, 0.7, 0.2)),     # Verde
+            (565, (1.0, 0.85, 0.0)),    # Amarelo
+            (590, (1.0, 0.5, 0.0)),     # Laranja
+            (625, (1.0, 0.0, 0.0)),     # Vermelho
+            (700, (0.7, 0.0, 0.0)),     # Vermelho distante
+            (780, (0.5, 0.0, 0.0)),     # Fim do espectro visível
+        ]
+        # Fora do espectro visível (cinza)
+        if wavelength < 380:
+            return (0.6, 0.6, 0.7)  # UVA
+        if wavelength > 780:
+            return (0.5, 0.5, 0.5)
+        # Busca interpolação entre os pontos
+        for i in range(len(color_points) - 1):
+            wl0, c0 = color_points[i]
+            wl1, c1 = color_points[i + 1]
+            if wl0 <= wavelength <= wl1:
+                t = (wavelength - wl0) / (wl1 - wl0)
+                r = c0[0] + (c1[0] - c0[0]) * t
+                g = c0[1] + (c1[1] - c0[1]) * t
+                b = c0[2] + (c1[2] - c0[2]) * t
+                return (r, g, b)
+        # Se não encontrar, retorna cinza
+        return (0.5, 0.5, 0.5)
+
+    root = tk.Tk()
+    root.withdraw()
+    pasta_principal = filedialog.askdirectory(
+        title="Selecione a pasta principal com subpastas contendo arquivos uMOL_*")
+    if not pasta_principal:
+        messagebox.showwarning("Aviso", "Nenhuma pasta selecionada.")
+        return
+
+    arquivos_umol = []
+    grupos = []
+    for dirpath, _, filenames in os.walk(pasta_principal):
+        subpasta = os.path.relpath(dirpath, pasta_principal)
+        if subpasta == ".":
+            continue
+        for f in filenames:
+            if f.startswith('uMOL_') and f.endswith('.txt'):
+                arquivos_umol.append(os.path.join(dirpath, f))
+                grupos.append(subpasta)
+    if not arquivos_umol:
+        messagebox.showwarning(
+            "Aviso", "Nenhum arquivo uMOL_*.txt encontrado nas subpastas.")
+        return
+
+    nomes_legenda = {
+        '99100': 'RBW100%',
+        '0T':    'RBW15%',
+        '100V':  'R100%',
+        '100B':  'W100%',
+        '100A':  'B100%',
+        '0V':    'R15%',
+        '0B':    'W15%',
+        '0A':    'B15%'
+    }
+
+    # Agrupa arquivos por subpasta
+    grupos_dict = {}
+    for arquivo, grupo in zip(arquivos_umol, grupos):
+        if grupo not in grupos_dict:
+            grupos_dict[grupo] = []
+        grupos_dict[grupo].append(arquivo)
+
+    if not grupos_dict:
+        messagebox.showwarning("Aviso", "Nenhum grupo encontrado.")
+        return
+
+    grupos_lista = list(grupos_dict.keys())
+    n_grupos = len(grupos_lista)
+    ncols = min(3, n_grupos)
+    nrows = math.ceil(n_grupos / ncols)
+
+    fig, axs = plt.subplots(nrows=nrows, ncols=ncols,
+                            figsize=(7*ncols, 4*nrows), dpi=100)
+    if n_grupos == 1:
+        axs = np.array([[axs]])
+    elif n_grupos > 1 and nrows == 1:
+        axs = np.array([axs])
+    axs = axs.flatten()
+
+    xticks = np.arange(380, 781, 50)
+
+    for idx, grupo in enumerate(grupos_lista):
+        ax = axs[idx]
+        arquivos = grupos_dict[grupo]
+        for arquivo in arquivos:
+            try:
+                df = pd.read_csv(arquivo, sep=r'\t|\s+',
+                                 engine='python', comment='#')
+                if 'Wavelength(nm)' not in df.columns or not any('PFD' in col and 'umol' in col for col in df.columns):
+                    continue
+                col_wave = 'Wavelength(nm)'
+                col_pfd = None
+                for col in df.columns:
+                    if 'PFD' in col and 'umol' in col:
+                        col_pfd = col
+                if col_wave not in df.columns or col_pfd is None:
+                    continue
+                x = df[col_wave].values
+                y = df[col_pfd].values
+                if len(x) < 2 or len(y) < 2:
+                    continue
+                points = np.array([x, y]).T.reshape((-1, 1, 2))
+                segments = np.concatenate([points[:-1], points[1:]], axis=1)
+                # Gera lista de cores para cada segmento (degradê)
+                colors = [wavelength_to_rgb(wl) for wl in x[:-1]]
+                lc = LineCollection(segments, colors=colors, linewidth=2)
+                ax.add_collection(lc)
+            except Exception as e:
+                print(f"Erro ao processar {arquivo}: {e}")
+        # Eixo X fixo de 380 a 780 nm, ticks a cada 50 nm
+        ax.set_xlim(380, 780)
+        # Limites de Y personalizados conforme os dados do grupo
+        if arquivos:
+            y_min, y_max = None, None
+            for arquivo in arquivos:
+                try:
+                    df = pd.read_csv(arquivo, sep=r'\t|\s+',
+                                     engine='python', comment='#')
+                    if 'Wavelength(nm)' not in df.columns or not any('PFD' in col and 'umol' in col for col in df.columns):
+                        continue
+                    col_pfd = None
+                    for col in df.columns:
+                        if 'PFD' in col and 'umol' in col:
+                            col_pfd = col
+                    if col_pfd is None:
+                        continue
+                    y = df[col_pfd].values
+                    if len(y) < 2:
+                        continue
+                    ymin, ymax = np.nanmin(y), np.nanmax(y)
+                    if y_min is None or ymin < y_min:
+                        y_min = ymin
+                    if y_max is None or ymax > y_max:
+                        y_max = ymax
+                except Exception:
+                    continue
+            if y_min is not None and y_max is not None and y_max > y_min:
+                ax.set_ylim(y_min - 0.05*(y_max-y_min),
+                            y_max + 0.05*(y_max-y_min))
+        ax.set_xticks(xticks)
+        # Label do eixo Y apenas na primeira coluna
+        if idx % ncols == 0:
+            ax.set_ylabel("PFD (μmol m⁻² s⁻¹)", fontsize=12)
+        else:
+            ax.set_ylabel("")
+        # Label do eixo X apenas na última linha
+        if idx // ncols == nrows - 1:
+            ax.set_xlabel("Wavelength, λ (nm)", fontsize=12)
+        else:
+            ax.set_xlabel("")
+        ax.set_title(f"Grupo: {nomes_legenda.get(grupo, grupo)}", fontsize=12)
+        ax.grid(True, alpha=0.3)
+
+    # Remove subplots vazios
+    for j in range(idx+1, len(axs)):
+        fig.delaxes(axs[j])
+    fig.subplots_adjust(left=0.060, top=0.95, right=0.975,
+                        wspace=0.15, hspace=0.350, bottom=0.08)
+    plt.show()
+    plt.ioff()

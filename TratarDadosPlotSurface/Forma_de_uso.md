@@ -38,6 +38,12 @@ Os dados são obtidos pelo aparelho LiCor LI-180 Spectometer e devem ser colocad
 5. **Plotar múltiplas superfícies 3D**
     - Plota superfícies 3D para todas as subpastas encontradas, cada uma representando uma condição de luz.
     - Escolha entre PPFD ou PFD na interface antes de plotar.
+    - Permite seleção dinâmica das superfícies exibidas por meio de checkboxes acima do gráfico na página HTML gerada.
+    - Cada superfície recebe nome amigável (ex: RBW100%, B15%, etc) e cores distintas.
+6. **Plotar espectros uMOL**
+    - Permite selecionar a pasta principal e plota todos os espectros de arquivos uMOL_ encontrados nas subpastas em um único gráfico interativo (Plotly).
+    - A seleção dos grupos/pastas a serem exibidos é feita por checkboxes acima do gráfico na própria página HTML.
+    - Os nomes dos grupos seguem o padrão amigável (RBW100%, B15%, etc).
 
 ## 4. Observações
 

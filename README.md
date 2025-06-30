@@ -5,7 +5,6 @@
   </a>
 </div>
 
-
 Este repositório contém scripts, funções e dados para análise e visualização de espectros medidos com espectrômetro, além de ferramentas para tratamento de dados e geração de gráficos.
 
 ## 📁 Estrutura do Projeto
@@ -40,13 +39,15 @@ Este repositório contém scripts, funções e dados para análise e visualizaç
 
 - Consulte os scripts e funções para detalhes sobre parâmetros e formatos de entrada.
 - O arquivo `Forma_de_uso.md` em `TratarDadosPlotSurface/` traz instruções específicas para uso dos scripts Python.
+- Os gráficos de múltiplas superfícies e espectros uMOL_ geram páginas HTML interativas, com seleção dinâmica de grupos/pastas por checkboxes acima do gráfico.
 ****
 ## 🆕 Novidades e melhorias recentes
 
-- A interface gráfica está mais organizada, com opções de interpolação e escolha de variável (PPFD/PFD) separadas em subseções.
-- Os botões de interpolação agora têm destaque azul quando selecionados, facilitando a visualização.
-- Ao tentar organizar arquivos, o sistema avisa se não houver arquivos válidos para mover, evitando confusões.
-- Mensagens de feedback e confirmação mais claras em todas as ações principais.
+- Interface gráfica reorganizada, com opções de interpolação e escolha de variável (PPFD/PFD) separadas em subseções.
+- Botões de interpolação com destaque azul quando selecionados.
+- Feedbacks e confirmações mais claros em todas as ações principais.
+- Gráficos 3D sem legenda para visualização mais limpa.
+- Visualização de espectros uMOL_ e múltiplas superfícies com seleção dinâmica de grupos/pastas diretamente na página HTML.
 
 ## 📦 Dependências
 

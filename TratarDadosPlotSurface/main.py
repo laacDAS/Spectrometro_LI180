@@ -171,16 +171,21 @@ class App(tb.Window):
         btn_surface.pack(pady=4, padx=8)
         ToolTip(
             btn_surface, "Plota uma superfície 3D interpolada para os dados da pasta selecionada.")
-        btn_mult = tb.Button(frame_plot, text="Gráfico 3D com múltiplas superfícies", width=28, bootstyle=PRIMARY,
+        btn_mult = tb.Button(frame_plot, text="Gráfico 3D de múltiplas superfícies", width=28, bootstyle=PRIMARY,
                              command=self.plotar_multiplas_surfaces)
         btn_mult.pack(pady=4, padx=8)
         ToolTip(
             btn_mult, "Plota múltiplas superfícies 3D para todas as subpastas encontradas.")
-        btn_umol = tb.Button(frame_plot, text="Plotar espectros uMOL", width=28, bootstyle=PRIMARY,
+        btn_umol = tb.Button(frame_plot, text="Plotar espectros uMOL (Plotly)", width=28, bootstyle=PRIMARY,
                              command=fn.plot_spectral)
         btn_umol.pack(pady=4, padx=8)
         ToolTip(
-            btn_umol, "Seleciona a pasta principal e plota todos os espectros de arquivos uMOL_ encontrados nas subpastas (Plotly)")
+            btn_umol, "Plota todos os espectros de arquivos uMOL encontrados nas subpastas (Plotly interativo).")
+        btn_umol_mat = tb.Button(frame_plot, text="Plotar espectros uMOL (Matplotlib)", width=28, bootstyle=PRIMARY,
+                                 command=fn.plot_spectral_matplotlib)
+        btn_umol_mat.pack(pady=4, padx=8)
+        ToolTip(
+            btn_umol_mat, "Plota todos os espectros de arquivos uMOL encontrados nas subpastas com linhas multicoloridas (Matplotlib).")
 
     def _create_opcoes_graficos(self, parent):
         frame_opts = tb.Labelframe(
@@ -325,7 +330,10 @@ class App(tb.Window):
 
     def confirmar_sair(self):
         if messagebox.askyesno("Confirmação", "Deseja realmente sair do programa?"):
+            self.destroy()
             self.quit()
+            sys.exit(0)
+        self.quit()
 
 
 if __name__ == "__main__":
