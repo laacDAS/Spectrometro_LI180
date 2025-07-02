@@ -545,11 +545,11 @@ def plot_spectral_matplotlib():
     O eixo X vai de 380 a 780 nm, com marcação a cada 50 nm.
     As cores seguem o degradê espectral solicitado.
     Layout ajustado conforme solicitado.
+    Se o usuário selecionar uma subpasta (sem subpastas), plota um único gráfico com todos os arquivos dessa subpasta.
     """
 
     # Função para mapear comprimento de onda para cor RGB com degradê suave entre as faixas
     def wavelength_to_rgb(wavelength):
-        # Pontos de transição (nm) e cores principais (R, G, B)
         color_points = [
             (380, (0.56, 0.0, 1.0)),    # Violeta
             (440, (0.0, 0.3, 1.0)),     # Azul
@@ -561,12 +561,10 @@ def plot_spectral_matplotlib():
             (700, (0.7, 0.0, 0.0)),     # Vermelho distante
             (780, (0.5, 0.0, 0.0)),     # Fim do espectro visível
         ]
-        # Fora do espectro visível (cinza)
         if wavelength < 380:
             return (0.6, 0.6, 0.7)  # UVA
         if wavelength > 780:
             return (0.5, 0.5, 0.5)
-        # Busca interpolação entre os pontos
         for i in range(len(color_points) - 1):
             wl0, c0 = color_points[i]
             wl1, c1 = color_points[i + 1]
@@ -576,7 +574,6 @@ def plot_spectral_matplotlib():
                 g = c0[1] + (c1[1] - c0[1]) * t
                 b = c0[2] + (c1[2] - c0[2]) * t
                 return (r, g, b)
-        # Se não encontrar, retorna cinza
         return (0.5, 0.5, 0.5)
 
     root = tk.Tk()
@@ -587,19 +584,32 @@ def plot_spectral_matplotlib():
         messagebox.showwarning("Aviso", "Nenhuma pasta selecionada.")
         return
 
+    # Verifica se a pasta selecionada possui subpastas
+    subpastas = [d for d in os.listdir(pasta_principal)
+                 if os.path.isdir(os.path.join(pasta_principal, d))]
     arquivos_umol = []
     grupos = []
-    for dirpath, _, filenames in os.walk(pasta_principal):
-        subpasta = os.path.relpath(dirpath, pasta_principal)
-        if subpasta == ".":
-            continue
-        for f in filenames:
+
+    if subpastas:
+        # Caso pasta principal com subpastas: busca recursiva
+        for dirpath, _, filenames in os.walk(pasta_principal):
+            subpasta = os.path.relpath(dirpath, pasta_principal)
+            if subpasta == ".":
+                continue
+            for f in filenames:
+                if f.startswith('uMOL_') and f.endswith('.txt'):
+                    arquivos_umol.append(os.path.join(dirpath, f))
+                    grupos.append(subpasta)
+    else:
+        # Caso subpasta (sem subpastas): busca apenas nesta pasta
+        for f in os.listdir(pasta_principal):
             if f.startswith('uMOL_') and f.endswith('.txt'):
-                arquivos_umol.append(os.path.join(dirpath, f))
-                grupos.append(subpasta)
+                arquivos_umol.append(os.path.join(pasta_principal, f))
+                grupos.append("Selecionada")
+
     if not arquivos_umol:
         messagebox.showwarning(
-            "Aviso", "Nenhum arquivo uMOL_*.txt encontrado nas subpastas.")
+            "Aviso", "Nenhum arquivo uMOL_*.txt encontrado.")
         return
 
     nomes_legenda = {
@@ -613,7 +623,7 @@ def plot_spectral_matplotlib():
         '0A':    'B15%'
     }
 
-    # Agrupa arquivos por subpasta
+    # Agrupa arquivos por grupo
     grupos_dict = {}
     for arquivo, grupo in zip(arquivos_umol, grupos):
         if grupo not in grupos_dict:
@@ -626,9 +636,81 @@ def plot_spectral_matplotlib():
 
     grupos_lista = list(grupos_dict.keys())
     n_grupos = len(grupos_lista)
+
+    # Se for só um grupo (caso subpasta), plota um único gráfico
+    if n_grupos == 1:
+        fig, ax = plt.subplots(figsize=(8, 5), dpi=100)
+        arquivos = grupos_dict[grupos_lista[0]]
+        for arquivo in arquivos:
+            try:
+                df = pd.read_csv(arquivo, sep=r'\t|\s+',
+                                 engine='python', comment='#')
+                if 'Wavelength(nm)' not in df.columns or not any('PFD' in col and 'umol' in col for col in df.columns):
+                    continue
+                col_wave = 'Wavelength(nm)'
+                col_pfd = None
+                for col in df.columns:
+                    if 'PFD' in col and 'umol' in col:
+                        col_pfd = col
+                if col_wave not in df.columns or col_pfd is None:
+                    continue
+                x = df[col_wave].values
+                y = df[col_pfd].values
+                if len(x) < 2 or len(y) < 2:
+                    continue
+                points = np.array([x, y]).T.reshape((-1, 1, 2))
+                segments = np.concatenate([points[:-1], points[1:]], axis=1)
+                colors = [wavelength_to_rgb(wl) for wl in x[:-1]]
+                lc = LineCollection(segments, colors=colors, linewidth=2)
+                ax.add_collection(lc)
+            except Exception as e:
+                print(f"Erro ao processar {arquivo}: {e}")
+        ax.set_xlim(380, 780)
+        # Limites de Y personalizados conforme os dados do grupo
+        y_min, y_max = None, None
+        for arquivo in arquivos:
+            try:
+                df = pd.read_csv(arquivo, sep=r'\t|\s+',
+                                 engine='python', comment='#')
+                col_pfd = None
+                for col in df.columns:
+                    if 'PFD' in col and 'umol' in col:
+                        col_pfd = col
+                if col_pfd is None:
+                    continue
+                y = df[col_pfd].values
+                if len(y) < 2:
+                    continue
+                ymin, ymax = np.nanmin(y), np.nanmax(y)
+                if y_min is None or ymin < y_min:
+                    y_min = ymin
+                if y_max is None or ymax > y_max:
+                    y_max = ymax
+            except Exception:
+                continue
+        if y_min is not None and y_max is not None and y_max > y_min:
+            ax.set_ylim(y_min - 0.05*(y_max-y_min),
+                        y_max + 0.05*(y_max-y_min))
+        xticks = np.arange(380, 781, 50)
+        ax.set_xticks(xticks)
+        ax.set_ylabel("PFD (μmol m⁻² s⁻¹)", fontsize=12)
+        ax.set_xlabel("Wavelength, λ (nm)", fontsize=12)
+        titulo = grupos_lista[0]
+        if titulo in nomes_legenda:
+            titulo = nomes_legenda[titulo]
+        elif titulo == "Selecionada":
+            titulo = "Arquivos da pasta selecionada"
+        ax.set_title(f"Grupo: {titulo}", fontsize=13)
+        ax.grid(True, alpha=0.3)
+        fig.subplots_adjust(left=0.10, top=0.93, right=0.98,
+                            wspace=0.15, hspace=0.350, bottom=0.13)
+        plt.show()
+        plt.ioff()
+        return
+
+    # Caso múltiplos grupos (pasta principal com subpastas)
     ncols = min(3, n_grupos)
     nrows = math.ceil(n_grupos / ncols)
-
     fig, axs = plt.subplots(nrows=nrows, ncols=ncols,
                             figsize=(7*ncols, 4*nrows), dpi=100)
     if n_grupos == 1:
@@ -636,7 +718,6 @@ def plot_spectral_matplotlib():
     elif n_grupos > 1 and nrows == 1:
         axs = np.array([axs])
     axs = axs.flatten()
-
     xticks = np.arange(380, 781, 50)
 
     for idx, grupo in enumerate(grupos_lista):
@@ -661,13 +742,11 @@ def plot_spectral_matplotlib():
                     continue
                 points = np.array([x, y]).T.reshape((-1, 1, 2))
                 segments = np.concatenate([points[:-1], points[1:]], axis=1)
-                # Gera lista de cores para cada segmento (degradê)
                 colors = [wavelength_to_rgb(wl) for wl in x[:-1]]
                 lc = LineCollection(segments, colors=colors, linewidth=2)
                 ax.add_collection(lc)
             except Exception as e:
                 print(f"Erro ao processar {arquivo}: {e}")
-        # Eixo X fixo de 380 a 780 nm, ticks a cada 50 nm
         ax.set_xlim(380, 780)
         # Limites de Y personalizados conforme os dados do grupo
         if arquivos:

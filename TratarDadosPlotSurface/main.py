@@ -333,6 +333,7 @@ class App(tb.Window):
             self.destroy()
             self.quit()
             sys.exit(0)
+        self.destroy()
         self.quit()
 
 
