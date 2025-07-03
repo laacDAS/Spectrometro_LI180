@@ -33,7 +33,8 @@ resumo <- resumo %>%
   mutate(
     texto = glue(
       "Luminária: {identificador_luminaria}
-Valores em µmol m⁻² s⁻¹
+Valores em µmol m/2.s/1
+
 Faixa        |   Máx  |   Mín
 PPFD         | {sprintf('%6.1f', ppfd_max)} | {sprintf('%6.1f', ppfd_min)}
 PFD total    | {sprintf('%6.2f', pfd_max)} | {sprintf('%6.2f', pfd_min)}

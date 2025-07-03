@@ -12,6 +12,8 @@ Este repositório contém scripts, funções e dados para análise e visualizaç
 - **plot_spectra/** 📊: Scripts em R para leitura, processamento e plotagem de espectros. Inclui funções auxiliares, gráficos gerados e dados de referência.
   - `main.R`: Script principal para análise e plotagem de espectros.
   - `functions.R`: Funções auxiliares para manipulação dos dados.
+  - `gerar_tabela_fotobiologica.R`: Script dedicado para criar uma tabela HTML com dados fotobiológicos das luminárias.
+  - `etiquetas.r`: Script para gerar um PDF com etiquetas de resumo para as luminárias.
   - `spectrometer_sun.R`: Script para espectros solares.
   - `dados/`: Dados brutos e de referência (arquivos `.txt`, `.RDS`, `.xlsx`).
   - `outputs/`: Gráficos e imagens gerados pelos scripts.
@@ -37,8 +39,9 @@ Este repositório contém scripts, funções e dados para análise e visualizaç
 
 ## ℹ️ Observações
 
-- Consulte os scripts e funções para detalhes sobre parâmetros e formatos de entrada.
-- O arquivo `Forma_de_uso.md` em `TratarDadosPlotSurface/` traz instruções específicas para uso dos scripts Python.
+- Para instruções detalhadas sobre cada módulo, consulte os guias de uso específicos:
+  - 📜 [**Guia de Uso - Análise de Espectros (R)**](./plot_spectra/Forma_de_uso.md)
+  - 📜 [**Guia de Uso - Tratamento de Superfície (Python)**](./TratarDadosPlotSurface/Forma_de_uso.md)
 - Os gráficos de múltiplas superfícies e espectros uMOL_ geram páginas HTML interativas, com seleção dinâmica de grupos/pastas por checkboxes acima do gráfico.
 ****
 ## 🆕 Novidades e melhorias recentes
@@ -48,6 +51,8 @@ Este repositório contém scripts, funções e dados para análise e visualizaç
 - Feedbacks e confirmações mais claros em todas as ações principais.
 - Gráficos 3D sem legenda para visualização mais limpa.
 - Visualização de espectros uMOL_ e múltiplas superfícies com seleção dinâmica de grupos/pastas diretamente na página HTML.
+- **Geração de Tabela Fotobiológica**: Adicionado script `gerar_tabela_fotobiologica.R` que cria um resumo (`tabela_fotobiologica.html`) com dados de PPFD, PFD e PFD por faixa de luz para as luminárias monocromáticas.
+- **Geração de Etiquetas**: Adicionado script `etiquetas.r` para criar um PDF com etiquetas de resumo (valores mín/máx) para cada luminária, prontas para impressão.
 
 ## 📦 Dependências
 
