@@ -5,7 +5,7 @@ library(gridExtra)
 library(grid)
 
 # 1. Ler e limpar os dados
-dados <- read_csv("dados_fotobiologicos_compilados.csv") %>%
+dados <- read_csv("plot_spectra/dados_fotobiologicos_compilados.csv") %>%
   clean_names()
 
 # 2. Agrupar e calcular máximos e mínimos
@@ -33,7 +33,7 @@ resumo <- resumo %>%
   mutate(
     texto = glue(
       "Luminária: {identificador_luminaria}
-Valores em µmol m/2.s/1
+Valores em µmol m-2 s-1
 
 Faixa        |   Máx  |   Mín
 PPFD         | {sprintf('%6.1f', ppfd_max)} | {sprintf('%6.1f', ppfd_min)}
@@ -50,21 +50,21 @@ Far Red (FR) | {sprintf('%6.2f', pfd_fr_max)} | {sprintf('%6.2f', pfd_fr_min)}"
 etiquetas_grobs <- lapply(resumo$texto, function(txt) {
   textGrob(
     label = txt,
-    gp = gpar(fontsize = 8.5, fontfamily = "mono", lineheight = 1.3),
+    gp = gpar(fontsize = 12, fontfamily = "mono", lineheight = 1.3),
     just = "left",
     x = 0.05
   )
 })
 
-# 5. Layout para etiquetas Avery (3 colunas × 10 linhas)
+# 5. Layout para etiquetas Avery
 n_col <- 3
-n_row <- 4
+n_row <- 3
 por_pagina <- n_col * n_row
 n_total <- length(etiquetas_grobs)
 n_paginas <- ceiling(n_total / por_pagina)
 
 # 6. Gerar PDF final
-pdf("etiquetas_LAAC.pdf", width = 11, height = 8.5) # paisagem
+pdf("plot_spectra/etiquetas_LAAC.pdf", width = 11, height = 11, ) # paisagem
 
 for (pagina in 1:n_paginas) {
   grid.newpage()
