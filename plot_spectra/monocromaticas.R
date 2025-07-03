@@ -508,6 +508,10 @@ gerar_tabela_fotobiologica_csv <- function(
       into = c("tipo_luz", "identificador_luminaria"),
       sep = "\\s*\\|\\s*",
       remove = TRUE
+    ) |>
+    # Extrai apenas o número do identificador da luminária
+    dplyr::mutate(
+      identificador_luminaria = readr::parse_number(identificador_luminaria)
     )
 
   readr::write_csv(tabela_completa, arquivo_saida_csv)
